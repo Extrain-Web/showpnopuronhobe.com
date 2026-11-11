@@ -38,6 +38,8 @@ const MlmController = {
         ok(res, 'Notifications marked as read');
     }),
     myWithdraws: catchAsync(async (req, res) => ok(res, 'Withdraw requests fetched', await MlmService.getMyWithdraws(req.user!.userId))),
+    myPoints: catchAsync(async (req, res) => ok(res, 'Point history fetched', await MlmService.getMyPoints(req.user!.userId))),
+    villages: catchAsync(async (req, res) => ok(res, 'Villages fetched', await MlmService.listVillages(String(req.query.district || '')))),
     createWithdraw: catchAsync(async (req, res) => {
         const w = await MlmService.requestWithdraw(req.user!.userId, req.body);
         sendResponse(res, { statusCode: 201, success: true, message: 'Withdraw request sent', data: w });
@@ -67,6 +69,13 @@ const MlmController = {
     club: catchAsync(async (_req, res) => ok(res, 'Rank Club fetched', await MlmService.adminGetClub())),
     distributeClub: catchAsync(async (_req, res) => ok(res, 'Rank Club distributed', await MlmService.distributeClub('manual'))),
     reports: catchAsync(async (_req, res) => ok(res, 'Reports fetched', await MlmService.adminReports())),
+    adminVillages: catchAsync(async (req, res) => {
+        const r = await MlmService.adminListVillages(req.query);
+        ok(res, 'Villages fetched', r.data, r.meta);
+    }),
+    addVillage: catchAsync(async (req, res) => ok(res, 'Village added', await MlmService.adminAddVillage(req.body))),
+    updateVillage: catchAsync(async (req, res) => ok(res, 'Village updated', await MlmService.adminUpdateVillage(req.params.id, req.body))),
+    deleteVillage: catchAsync(async (req, res) => ok(res, 'Village deleted', await MlmService.adminDeleteVillage(req.params.id))),
 };
 
 export default MlmController;

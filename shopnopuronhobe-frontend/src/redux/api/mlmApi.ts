@@ -73,6 +73,25 @@ export const mlmApi = baseApi.injectEndpoints({
             invalidatesTags: ['MlmAdmin', 'Mlm'],
         }),
         getMlmReports: builder.query<any, void>({ query: () => '/mlm/admin/reports', providesTags: ['MlmAdmin'] }),
+        getMyPoints: builder.query<any, void>({ query: () => '/mlm/me/points', providesTags: ['Mlm'] }),
+        // Villages of one district (public — used on the registration form).
+        getVillages: builder.query<any, string>({ query: (district) => ({ url: '/mlm/villages', params: { district } }), providesTags: ['MlmAdmin'] }),
+        getAdminVillages: builder.query<any, { page?: number; division?: string; district?: string; search?: string }>({
+            query: (params) => ({ url: '/mlm/admin/villages', params }),
+            providesTags: ['MlmAdmin'],
+        }),
+        addVillage: builder.mutation<any, { division: string; district: string; name: string }>({
+            query: (body) => ({ url: '/mlm/admin/villages', method: 'POST', body }),
+            invalidatesTags: ['MlmAdmin'],
+        }),
+        updateVillage: builder.mutation<any, { id: string; name: string }>({
+            query: ({ id, name }) => ({ url: `/mlm/admin/villages/${id}`, method: 'PATCH', body: { name } }),
+            invalidatesTags: ['MlmAdmin'],
+        }),
+        deleteVillage: builder.mutation<any, string>({
+            query: (id) => ({ url: `/mlm/admin/villages/${id}`, method: 'DELETE' }),
+            invalidatesTags: ['MlmAdmin'],
+        }),
     }),
 });
 
@@ -100,6 +119,12 @@ export const {
     useGetClubQuery,
     useDistributeClubMutation,
     useGetMlmReportsQuery,
+    useGetMyPointsQuery,
+    useGetVillagesQuery,
+    useGetAdminVillagesQuery,
+    useAddVillageMutation,
+    useUpdateVillageMutation,
+    useDeleteVillageMutation,
 } = mlmApi;
 
 export const errMsg = (e: any, fallback = 'Something went wrong') => e?.data?.message || e?.message || fallback;

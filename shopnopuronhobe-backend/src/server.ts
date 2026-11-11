@@ -64,6 +64,7 @@ connectDB()
         const { MlmService } = await import('./app/modules/mlm/mlm.service');
         await MlmService.getSettings();
         await MlmService.backfillMemberIds();
+        await MlmService.backfillVillages();
         MlmService.startScheduler();
     })
     .catch((err) => console.error('❌ Initial MongoDB connection failed:', err));

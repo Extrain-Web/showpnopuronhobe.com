@@ -58,6 +58,7 @@ const MENU: MenuItem[] = [
             { name: 'Rank Club', href: '/dashboard/admin/mlm/club' },
             { name: 'G-Tree', href: '/dashboard/admin/mlm/tree' },
             { name: 'Transactions', href: '/dashboard/admin/mlm/transactions' },
+            { name: 'Villages', href: '/dashboard/admin/mlm/villages' },
             { name: 'Settings', href: '/dashboard/admin/mlm/settings' },
         ],
     },

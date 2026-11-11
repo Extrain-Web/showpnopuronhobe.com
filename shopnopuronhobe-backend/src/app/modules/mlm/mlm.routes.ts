@@ -9,12 +9,14 @@ const admin = [authMiddleware, authorizeRoles('admin')];
 router.get('/settings/public', MlmController.publicSettings);
 router.get('/leaderboard', MlmController.leaderboard);
 router.get('/referrer/:code', MlmController.referrer);
+router.get('/villages', MlmController.villages);
 
 // ── Member ───────────────────────────────────────────
 router.get('/me', authMiddleware, MlmController.mySummary);
 router.post('/me/membership-request', authMiddleware, MlmController.requestMembership);
 router.get('/me/transactions', authMiddleware, MlmController.myTransactions);
 router.get('/me/withdraws', authMiddleware, MlmController.myWithdraws);
+router.get('/me/points', authMiddleware, MlmController.myPoints);
 router.get('/me/notifications', authMiddleware, MlmController.myNotifications);
 router.patch('/me/notifications/read', authMiddleware, MlmController.readNotifications);
 router.post('/me/withdraws', authMiddleware, MlmController.createWithdraw);
@@ -34,5 +36,9 @@ router.get('/admin/transactions', ...admin, MlmController.transactions);
 router.get('/admin/club', ...admin, MlmController.club);
 router.post('/admin/club/distribute', ...admin, MlmController.distributeClub);
 router.get('/admin/reports', ...admin, MlmController.reports);
+router.get('/admin/villages', ...admin, MlmController.adminVillages);
+router.post('/admin/villages', ...admin, MlmController.addVillage);
+router.patch('/admin/villages/:id', ...admin, MlmController.updateVillage);
+router.delete('/admin/villages/:id', ...admin, MlmController.deleteVillage);
 
 export const MlmRoutes = router;

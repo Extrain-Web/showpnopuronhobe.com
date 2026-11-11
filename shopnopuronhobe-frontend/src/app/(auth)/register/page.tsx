@@ -9,6 +9,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppDispatch } from '@/redux/hooks';
 import { loginSuccess } from '@/redux/slices/authSlice';
 import { useRegisterMutation } from '@/redux/api/authApi';
+import { useGetVillagesQuery } from '@/redux/api/mlmApi';
+
+const NEW_VILLAGE = '__new__';
 import { toast } from 'react-hot-toast';
 import { FiUser, FiLock, FiEye, FiEyeOff, FiArrowRight, FiMapPin, FiMail, FiPhone } from 'react-icons/fi';
 
@@ -26,9 +29,30 @@ const RegisterPageInner = () => {
     const [register, { isLoading }] = useRegisterMutation();
     const redirectPath = searchParams.get('redirect');
 
+    // Villages already saved for the chosen district; a new one can be typed in.
+    const { data: villageRes, isFetching: villagesLoading } = useGetVillagesQuery(formData.district, { skip: !formData.district });
+    const villages: { _id: string; name: string }[] = villageRes?.data || [];
+    const [addingVillage, setAddingVillage] = useState(false);
+    const typingVillage = addingVillage || (!!formData.district && !villagesLoading && villages.length === 0);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value, ...(name === 'division' ? { district: '' } : {}) }));
+        if (name === 'division' || name === 'district') setAddingVillage(false);
+        setFormData(prev => ({
+            ...prev,
+            [name]: value,
+            ...(name === 'division' ? { district: '', village: '' } : {}),
+            ...(name === 'district' ? { village: '' } : {}),
+        }));
+    };
+
+    const pickVillage = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (e.target.value === NEW_VILLAGE) {
+            setAddingVillage(true);
+            setFormData(prev => ({ ...prev, village: '' }));
+        } else {
+            setFormData(prev => ({ ...prev, village: e.target.value }));
+        }
     };
 
     // Pre-fill the referral code from ?ref= or from a referral link opened earlier.
@@ -216,10 +240,28 @@ const RegisterPageInner = () => {
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '7px' }}>Village / Area</label>
                     <div style={{ position: 'relative' }}>
                         <div style={{ ...iconStyle, color: focused === 'loc' ? 'var(--color-primary)' : '#9ca3af' }}><FiMapPin size={17} /></div>
-                        <input type="text" name="village" required value={formData.village}
-                            onChange={handleChange} onFocus={() => setFocused('loc')} onBlur={() => setFocused(null)}
-                            style={inputStyle('loc')} placeholder="Your village or area" autoComplete="address-level3" />
+                        {!formData.district ? (
+                            <select disabled style={{ ...inputStyle('loc'), appearance: 'auto' }}><option>Select a district first</option></select>
+                        ) : typingVillage ? (
+                            <input type="text" name="village" required value={formData.village} maxLength={60} autoFocus={addingVillage}
+                                onChange={handleChange} onFocus={() => setFocused('loc')} onBlur={() => setFocused(null)}
+                                style={inputStyle('loc')} placeholder={`New village in ${formData.district}`} autoComplete="address-level3" />
+                        ) : (
+                            <select name="village" required value={formData.village} onChange={pickVillage} disabled={villagesLoading}
+                                onFocus={() => setFocused('loc')} onBlur={() => setFocused(null)} style={{ ...inputStyle('loc'), appearance: 'auto' }}>
+                                <option value="">{villagesLoading ? 'Loading villages…' : 'Select your village'}</option>
+                                {villages.map(v => <option key={v._id} value={v.name}>{v.name}</option>)}
+                                <option value={NEW_VILLAGE}>➕ Add a new village</option>
+                            </select>
+                        )}
                     </div>
+                    {formData.district && typingVillage && (
+                        <p style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
+                            {villages.length > 0
+                                ? <>Adding a new village to {formData.district}. <button type="button" onClick={() => { setAddingVillage(false); setFormData(p => ({ ...p, village: '' })); }} style={{ color: 'var(--color-primary)', fontWeight: 700, background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>Pick from the list</button></>
+                                : <>No village saved for {formData.district} yet — type yours and it will be added.</>}
+                        </p>
+                    )}
                 </div>
 
                 {/* Referral code (optional) */}

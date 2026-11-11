@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FiArrowLeft, FiSearch, FiZoomIn, FiZoomOut, FiUsers, FiX, FiHome } from 'react-icons/fi';
 import { useGetTreeQuery, useLazySearchTreeQuery } from '@/redux/api/mlmApi';
 
@@ -18,6 +18,7 @@ function NodeCard({ n, linkIndex, onOpen, highlight }: { n: any; linkIndex?: num
     const border = linkIndex !== undefined ? LINK_COLORS[linkIndex] : 'var(--color-primary)';
     return (
         <div
+            data-node-id={String(n._id)}
             className={`relative ${chip.card} rounded-xl border-2 shadow-sm w-[190px] p-3 text-center transition ${highlight ? 'ring-4 ring-amber-300' : ''}`}
             style={{ borderColor: border, borderStyle: n.memberStatus === 'active' ? 'solid' : 'dashed' }}
         >
@@ -72,6 +73,66 @@ export default function GTree({ startNode }: { startNode?: string }) {
         list.sort((a, b) => ((b.memberStatus === 'active' ? 1 : 0) + b.teamActiveCount) - ((a.memberStatus === 'active' ? 1 : 0) + a.teamActiveCount));
         return list.map((c, i) => ({ ...c, linkIndex: Math.min(i, 3) }));
     }, [tree]);
+
+    // ── Pan (drag with the mouse) and pinch-zoom (two fingers) on the canvas ──
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const pointers = useRef(new Map<number, { x: number; y: number }>());
+    const dragStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+    const pinchStart = useRef<{ dist: number; zoom: number } | null>(null);
+    const [dragging, setDragging] = useState(false);
+    const clampZoom = (z: number) => Math.min(1.6, Math.max(0.5, +z.toFixed(2)));
+    const pinchDist = () => {
+        const [a, b] = [...pointers.current.values()];
+        return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        if ((e.target as HTMLElement).closest('button, a, input')) return; // keep card buttons clickable
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.current.size === 2) {
+            pinchStart.current = { dist: pinchDist(), zoom };
+            dragStart.current = null;
+        } else if (e.pointerType === 'mouse' && e.button === 0 && canvasRef.current) {
+            dragStart.current = { x: e.clientX, y: e.clientY, left: canvasRef.current.scrollLeft, top: canvasRef.current.scrollTop };
+            setDragging(true);
+            e.currentTarget.setPointerCapture(e.pointerId);
+        }
+    };
+    const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!pointers.current.has(e.pointerId)) return;
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pinchStart.current && pointers.current.size === 2) {
+            setZoom(clampZoom(pinchStart.current.zoom * (pinchDist() / pinchStart.current.dist)));
+        } else if (dragStart.current && canvasRef.current) {
+            canvasRef.current.scrollLeft = dragStart.current.left - (e.clientX - dragStart.current.x);
+            canvasRef.current.scrollTop = dragStart.current.top - (e.clientY - dragStart.current.y);
+        }
+    };
+    const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        pointers.current.delete(e.pointerId);
+        if (pointers.current.size < 2) pinchStart.current = null;
+        if (pointers.current.size === 0) { dragStart.current = null; setDragging(false); }
+    };
+    // Ctrl + mouse wheel zooms, like a map. Needs a non-passive listener to stop the page zooming.
+    const hasTree = !!tree;
+    useEffect(() => {
+        const el = canvasRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            setZoom(z => clampZoom(z + (e.deltaY < 0 ? 0.1 : -0.1)));
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, [hasTree]);
+
+    // Bring a found member's card into view once its level has loaded.
+    useEffect(() => {
+        if (!highlightId || isFetching) return;
+        const el = canvasRef.current?.querySelector(`[data-node-id="${highlightId}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }, [highlightId, isFetching, tree]);
 
     const goTo = (id: string) => setStack(s => [...s, id]);
     const back = () => setStack(s => s.slice(0, -1));
@@ -130,6 +191,7 @@ export default function GTree({ startNode }: { startNode?: string }) {
 
             {/* Legend */}
             <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                <span className="w-full text-gray-400">Drag the tree to move it · pinch or Ctrl + scroll to zoom · tap “View team” to open a member&apos;s team</span>
                 <span className="flex items-center gap-1.5"><span className="w-4 h-3 rounded border-2 border-gray-500 bg-white" /> Active member</span>
                 <span className="flex items-center gap-1.5"><span className="w-4 h-3 rounded border-2 border-dashed border-amber-500 bg-amber-50" /> Pending</span>
                 <span className="flex items-center gap-1.5"><span className="w-4 h-3 rounded border-2 border-dashed border-gray-400 bg-gray-100" /> Customer</span>
@@ -138,8 +200,13 @@ export default function GTree({ startNode }: { startNode?: string }) {
                 ))}
             </div>
 
-            {/* Canvas — scroll to pan */}
-            <div className="bg-[#f6fffa] border border-green-100 rounded-xl overflow-auto min-h-[420px] max-h-[75vh]">
+            {/* Canvas — drag (or scroll) to pan, pinch / Ctrl+wheel to zoom */}
+            <div
+                ref={canvasRef}
+                onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+                className={`bg-[#f6fffa] border border-green-100 rounded-xl overflow-auto min-h-[420px] max-h-[75vh] select-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                style={{ touchAction: 'pan-x pan-y' }}
+            >
                 {isError ? (
                     <p className="p-10 text-center text-red-500 text-sm">{(error as any)?.data?.message || 'Could not load the tree'}</p>
                 ) : !tree ? (

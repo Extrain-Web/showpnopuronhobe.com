@@ -171,3 +171,16 @@ export async function nextMemberId(): Promise<number> {
 }
 
 export type ObjectIdLike = Types.ObjectId | string;
+
+// ── Villages (registration picks one, or adds a new one) ──────────
+const villageSchema = new Schema({
+    division: { type: String, required: true, trim: true },
+    district: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    nameKey: { type: String, required: true }, // lower-case, single-spaced — blocks duplicates
+    memberCount: { type: Number, default: 0 },
+}, { timestamps: true });
+villageSchema.index({ district: 1, nameKey: 1 }, { unique: true });
+
+export const Village = model('Village', villageSchema);
+export const villageKey = (name: string) => String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();

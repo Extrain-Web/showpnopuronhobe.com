@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import config from '../../config';
 import AppError from '../../utils/AppError';
 import { User } from '../user/user.model';
+import { Village, villageKey } from '../mlm/mlm.model';
 import { IAuthResponse, IJwtPayload, ITokens } from './auth.interface';
 import { TLoginInput, TRegisterInput } from './auth.validation';
 
@@ -64,6 +65,16 @@ const AuthService = {
             status: 'active',
             isEmailVerified: false,
         });
+
+        // A village typed for the first time joins the shared list for its district.
+        const villageName = String(village || '').trim().replace(/\s+/g, ' ');
+        if (division && district && villageName) {
+            await Village.updateOne(
+                { district, nameKey: villageKey(villageName) },
+                { $setOnInsert: { division, district, name: villageName, nameKey: villageKey(villageName) }, $inc: { memberCount: 1 } },
+                { upsert: true },
+            ).catch(() => { /* saved by a parallel registration */ });
+        }
 
         const jwtPayload: IJwtPayload = { userId: user._id!.toString(), email: user.email, role: user.role };
         const tokens = this.generateTokens(jwtPayload);

@@ -5,7 +5,7 @@ import { Order } from '../order/order.model';
 import { Product } from '../product/product.model';
 import {
     MlmSettings, DEFAULT_RANKS, WalletTransaction, WithdrawRequest,
-    ClubFund, ClubDistribution, CompanyEarning, Notification,
+    ClubFund, ClubDistribution, CompanyEarning, Notification, Village, villageKey,
 } from './mlm.model';
 
 /* ════════════════════════════════════════════════════════════════
@@ -521,6 +521,96 @@ const MlmService = {
 
     async getMyWithdraws(userId: string) {
         return WithdrawRequest.find({ user: userId }).sort({ createdAt: -1 }).limit(100);
+    },
+
+    /** Point history: every delivered order that earned points. */
+    async getMyPoints(userId: string) {
+        const [user, orders]: any = await Promise.all([
+            User.findById(userId).select('points'),
+            Order.find({ user: userId, pointsAwarded: { $gt: 0 } })
+                .select('orderId pointsAwarded total updatedAt createdAt items.name items.quantity')
+                .sort({ updatedAt: -1 })
+                .limit(200)
+                .lean(),
+        ]);
+        const fromOrders = orders.reduce((sum: number, o: any) => sum + (o.pointsAwarded || 0), 0);
+        return {
+            total: user?.points || 0,
+            fromOrders,
+            // Points that did not come from an order (e.g. migrated or added by the company).
+            other: Math.max(0, (user?.points || 0) - fromOrders),
+            history: orders.map((o: any) => ({
+                _id: o._id,
+                orderId: o.orderId,
+                points: o.pointsAwarded,
+                total: o.total,
+                items: (o.items || []).map((i: any) => `${i.name} × ${i.quantity}`).join(', '),
+                date: o.updatedAt || o.createdAt,
+            })),
+        };
+    },
+
+    /* ── Villages ────────────────────────────────────────────── */
+    async listVillages(district: string) {
+        if (!district) return [];
+        return Village.find({ district }).select('name memberCount').sort({ memberCount: -1, name: 1 }).limit(500).lean();
+    },
+
+    async adminListVillages(query: any) {
+        const filter: any = {};
+        if (query.division) filter.division = query.division;
+        if (query.district) filter.district = query.district;
+        if (query.search) filter.nameKey = { $regex: villageKey(query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') };
+        const page = Math.max(1, Number(query.page) || 1);
+        const limit = Math.min(100, Number(query.limit) || 30);
+        const [data, total] = await Promise.all([
+            Village.find(filter).sort({ division: 1, district: 1, name: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+            Village.countDocuments(filter),
+        ]);
+        return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    },
+
+    async adminAddVillage(body: any) {
+        const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+        if (!body.division || !body.district || name.length < 2) throw new AppError(400, 'Division, district and a village name are required');
+        const exists = await Village.exists({ district: body.district, nameKey: villageKey(name) });
+        if (exists) throw new AppError(400, `"${name}" already exists in ${body.district}`);
+        return Village.create({ division: body.division, district: body.district, name, nameKey: villageKey(name) });
+    },
+
+    async adminUpdateVillage(id: string, body: any) {
+        const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+        if (name.length < 2) throw new AppError(400, 'Village name is too short');
+        const v: any = await Village.findById(id);
+        if (!v) throw new AppError(404, 'Village not found');
+        const clash = await Village.exists({ _id: { $ne: id }, district: v.district, nameKey: villageKey(name) });
+        if (clash) throw new AppError(400, `"${name}" already exists in ${v.district}`);
+        v.name = name;
+        v.nameKey = villageKey(name);
+        await v.save();
+        return v;
+    },
+
+    async adminDeleteVillage(id: string) {
+        const v = await Village.findByIdAndDelete(id);
+        if (!v) throw new AppError(404, 'Village not found');
+        return v;
+    },
+
+    /** Fills the village list from users who registered before the list existed. */
+    async backfillVillages() {
+        if (await Village.estimatedDocumentCount()) return;
+        const rows: any[] = await User.aggregate([
+            { $match: { division: { $nin: [null, ''] }, district: { $nin: [null, ''] }, village: { $nin: [null, ''] } } },
+            { $group: { _id: { district: '$district', key: { $toLower: '$village' } }, division: { $first: '$division' }, name: { $first: '$village' }, n: { $sum: 1 } } },
+        ]);
+        for (const r of rows) {
+            await Village.updateOne(
+                { district: r._id.district, nameKey: villageKey(r.name) },
+                { $setOnInsert: { division: r.division, district: r._id.district, name: String(r.name).trim(), nameKey: villageKey(r.name) }, $set: { memberCount: r.n } },
+                { upsert: true },
+            ).catch(() => {});
+        }
     },
 
     /* ── G-Tree ──────────────────────────────────────────────── */

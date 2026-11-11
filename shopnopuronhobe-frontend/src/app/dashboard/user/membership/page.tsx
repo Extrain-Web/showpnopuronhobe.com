@@ -3,8 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { FiAward, FiCopy, FiShare2, FiStar, FiUsers, FiCreditCard, FiCheckCircle, FiClock, FiGift, FiTrendingUp } from 'react-icons/fi';
-import { useGetMySummaryQuery, useGetMlmPublicSettingsQuery, useRequestMembershipMutation, errMsg, taka } from '@/redux/api/mlmApi';
+import { FiAward, FiCopy, FiShare2, FiStar, FiUsers, FiCreditCard, FiCheckCircle, FiClock, FiGift, FiTrendingUp, FiList } from 'react-icons/fi';
+import { useGetMySummaryQuery, useGetMlmPublicSettingsQuery, useRequestMembershipMutation, useGetMyPointsQuery, errMsg, taka } from '@/redux/api/mlmApi';
 import { LINK_COLORS } from '@/components/mlm/GTree';
 
 const Bar = ({ value, max, color = 'var(--color-primary)' }: { value: number; max: number; color?: string }) => {
@@ -36,7 +36,8 @@ export default function MembershipPage() {
 
     const s = data.data;
     const ranks: any[] = pub?.data?.ranks || [];
-    const link = typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${s.referralCode}` : '';
+    // ?ref=username reads better when shared; the code is the fallback for accounts without one.
+    const link = typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${encodeURIComponent(s.username || s.referralCode)}` : '';
     const canRequest = (s.memberStatus === 'none' || s.memberStatus === 'rejected') && s.points >= s.membershipPoints;
 
     const copy = async () => {
@@ -192,6 +193,57 @@ export default function MembershipPage() {
                     <p className="text-xs text-gray-400 mt-2">Link numbers are new active members needed on top of the previous rank. Link 1–3 are your three biggest teams; Link 4 is all your other teams together.</p>
                 </Card>
             )}
+
+            <PointHistory />
         </div>
+    );
+}
+
+/** Every delivered order that earned points. */
+function PointHistory() {
+    const { data, isLoading } = useGetMyPointsQuery();
+    const p = data?.data;
+    const rows: any[] = p?.history || [];
+
+    return (
+        <Card title="Point History" icon={<FiList className="text-amber-500" />}
+            right={p ? <span className="text-xs font-bold text-gray-500">Total {p.total} points</span> : null}>
+            {isLoading ? (
+                <p className="text-sm text-gray-400 animate-pulse">Loading…</p>
+            ) : rows.length === 0 && !p?.other ? (
+                <div className="text-center py-6">
+                    <p className="text-sm text-gray-500">No points yet. Points are added when an order is delivered.</p>
+                    <Link href="/products" className="inline-block mt-3 text-sm font-bold px-4 py-2 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)]">Shop now</Link>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-xs text-gray-500 border-b bg-gray-50">
+                                <th className="p-2 text-left">Date</th><th className="p-2 text-left">Order</th>
+                                <th className="p-2 text-left">Products</th><th className="p-2 text-right">Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map(r => (
+                                <tr key={r._id} className="border-b border-gray-50">
+                                    <td className="p-2 whitespace-nowrap">{new Date(r.date).toLocaleDateString()}</td>
+                                    <td className="p-2 whitespace-nowrap font-semibold">{r.orderId}</td>
+                                    <td className="p-2 text-gray-500 max-w-[320px] truncate" title={r.items}>{r.items}</td>
+                                    <td className="p-2 text-right font-bold text-green-700">+{r.points}</td>
+                                </tr>
+                            ))}
+                            {p?.other > 0 && (
+                                <tr className="border-b border-gray-50">
+                                    <td className="p-2 text-gray-400">—</td>
+                                    <td className="p-2 text-gray-500" colSpan={2}>Points added by the company</td>
+                                    <td className="p-2 text-right font-bold text-green-700">+{p.other}</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </Card>
     );
 }
