@@ -1,5 +1,4 @@
 **/node_modules
-**/.env
 **/.env.local
 **/.env.*.local
 **/.next
@@ -8,3 +7,4 @@
 *.tsbuildinfo
 .claude/settings.local.json
 *.local.txt
+config.bat

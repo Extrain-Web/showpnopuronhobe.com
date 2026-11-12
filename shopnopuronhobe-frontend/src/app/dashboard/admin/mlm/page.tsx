@@ -2,12 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useGetMlmReportsQuery, useGetMlmPublicSettingsQuery, taka } from '@/redux/api/mlmApi';
+import { useGetMlmReportsQuery, useGetMlmSettingsQuery, taka } from '@/redux/api/mlmApi';
 import { PageHead, Panel, Stat } from '@/components/mlm/AdminUi';
 
 export default function MlmOverviewPage() {
     const { data, isLoading } = useGetMlmReportsQuery();
-    const { data: pub } = useGetMlmPublicSettingsQuery();
+    const { data: pub } = useGetMlmSettingsQuery();
     const r = data?.data;
     const ranks: any[] = pub?.data?.ranks || [];
 

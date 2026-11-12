@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { FiCheck, FiX, FiSearch, FiShare2, FiDollarSign } from 'react-icons/fi';
 import {
     useGetMlmMembersQuery, useApproveMemberMutation, useRejectMemberMutation, useAdjustWalletMutation,
-    useGetMlmPublicSettingsQuery, errMsg, taka,
+    useGetMlmSettingsQuery, errMsg, taka,
 } from '@/redux/api/mlmApi';
 import { Pager, memberName, MEMBER_STATUS, inputCls } from './AdminUi';
 
@@ -17,7 +17,8 @@ export default function MembersTable({ pendingOnly = false }: { pendingOnly?: bo
     const [status, setStatus] = useState(pendingOnly ? 'pending' : '');
     const [rank, setRank] = useState('');
     const { data, isFetching } = useGetMlmMembersQuery({ page, limit: 20, search: term || undefined, memberStatus: status || undefined, rank: rank || undefined });
-    const { data: pub } = useGetMlmPublicSettingsQuery();
+    // Admin settings (the public endpoint no longer carries the rank table).
+    const { data: pub } = useGetMlmSettingsQuery();
     const [approve] = useApproveMemberMutation();
     const [reject] = useRejectMemberMutation();
     const [adjust] = useAdjustWalletMutation();

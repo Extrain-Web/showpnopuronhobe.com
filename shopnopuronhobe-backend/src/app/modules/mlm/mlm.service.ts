@@ -109,7 +109,7 @@ const MlmService = {
             referralBonus: s.referralBonus,
             generationCommission: { amount: s.generationCommission.amount },
             withdraw: s.withdraw,
-            ranks: s.ranks,
+            // The full rank table (targets, shares, rewards) is admin-only.
         };
     },
 

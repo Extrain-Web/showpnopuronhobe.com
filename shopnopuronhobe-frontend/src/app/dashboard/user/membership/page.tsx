@@ -3,8 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { FiAward, FiCopy, FiShare2, FiStar, FiUsers, FiCreditCard, FiCheckCircle, FiClock, FiGift, FiTrendingUp, FiList } from 'react-icons/fi';
-import { useGetMySummaryQuery, useGetMlmPublicSettingsQuery, useRequestMembershipMutation, useGetMyPointsQuery, errMsg, taka } from '@/redux/api/mlmApi';
+import { FiAward, FiCopy, FiShare2, FiStar, FiUsers, FiCreditCard, FiCheckCircle, FiClock, FiGift, FiList } from 'react-icons/fi';
+import { useGetMySummaryQuery, useRequestMembershipMutation, useGetMyPointsQuery, errMsg, taka } from '@/redux/api/mlmApi';
 import { LINK_COLORS } from '@/components/mlm/GTree';
 
 const Bar = ({ value, max, color = 'var(--color-primary)' }: { value: number; max: number; color?: string }) => {
@@ -28,14 +28,12 @@ const Card = ({ title, icon, children, right }: { title: string; icon: React.Rea
 
 export default function MembershipPage() {
     const { data, isLoading, isError } = useGetMySummaryQuery();
-    const { data: pub } = useGetMlmPublicSettingsQuery();
     const [requestMembership, { isLoading: requesting }] = useRequestMembershipMutation();
 
     if (isLoading) return <div className="p-10 text-center text-gray-400 animate-pulse">Loading…</div>;
     if (isError || !data?.data) return <div className="p-10 text-center text-red-500">Could not load your membership details.</div>;
 
     const s = data.data;
-    const ranks: any[] = pub?.data?.ranks || [];
     // ?ref=username reads better when shared; the code is the fallback for accounts without one.
     const link = typeof window !== 'undefined' ? `${window.location.origin}/register?ref=${encodeURIComponent(s.username || s.referralCode)}` : '';
     const canRequest = (s.memberStatus === 'none' || s.memberStatus === 'rejected') && s.points >= s.membershipPoints;
@@ -162,37 +160,6 @@ export default function MembershipPage() {
                     </div>
                 </Card>
             </div>
-
-            {/* Rank structure */}
-            {ranks.length > 0 && (
-                <Card title="Dream Fulfillment & Rank Structure" icon={<FiTrendingUp className="text-purple-600" />}>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-[#0b2a5b] text-white text-xs">
-                                    <th className="p-2 text-left">Rank</th><th className="p-2 text-left">Name</th>
-                                    <th className="p-2">Link 1</th><th className="p-2">Link 2</th><th className="p-2">Link 3</th><th className="p-2">Link 4</th>
-                                    <th className="p-2">Share</th><th className="p-2 text-left">Reward</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {ranks.map((r: any) => (
-                                    <tr key={r.level} className={`border-b border-gray-100 ${s.rank === r.level ? 'bg-amber-50 font-semibold' : ''}`}>
-                                        <td className="p-2">{r.level}</td>
-                                        <td className="p-2">{r.name}</td>
-                                        {r.level === 1
-                                            ? <td className="p-2 text-center" colSpan={4}>{r.directTarget} direct active referrals</td>
-                                            : r.links.map((v: number, i: number) => <td key={i} className="p-2 text-center">{v.toLocaleString()}</td>)}
-                                        <td className="p-2 text-center">{r.sharePercent}%</td>
-                                        <td className="p-2 text-amber-700">{r.reward || '—'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2">Link numbers are new active members needed on top of the previous rank. Link 1–3 are your three biggest teams; Link 4 is all your other teams together.</p>
-                </Card>
-            )}
 
             <PointHistory />
         </div>
