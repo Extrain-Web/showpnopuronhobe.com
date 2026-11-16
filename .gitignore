@@ -6,5 +6,4 @@
 **/build
 *.tsbuildinfo
 .claude/settings.local.json
-*.local.txt
 config.bat
