@@ -6,4 +6,7 @@
 **/build
 *.tsbuildinfo
 .claude/settings.local.json
-config.bat
+
+# local environment files
+.env
+.env.local
